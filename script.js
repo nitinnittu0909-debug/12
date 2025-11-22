@@ -163,3 +163,35 @@ function setupMessageBox() {
 // ------------------------
 createHearts();
 showPage(0);
+// -------------------------------
+// Firebase Config
+// -------------------------------
+const firebaseConfig = {
+  apiKey: "AIzaSyDPXv7lI-YcPk2FECNiM61yZ_SsVU-vR2M",
+  authDomain: "nitin-494ef.firebaseapp.com",
+  databaseURL: "https://nitin-494ef-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "nitin-494ef",
+  storageBucket: "nitin-494ef.firebasestorage.app",
+  messagingSenderId: "806134093724",
+  appId: "1:806134093724:web:d749b676504569c92e9a59",
+  measurementId: "G-MWH4YB8C20"
+};
+
+// -------------------------------
+// Firebase Initialize (v8 style)
+// -------------------------------
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+function sendMessage() {
+  const msgInput = document.getElementById("msgInput");
+  const text = msgInput.value.trim();
+  if (text.length === 0) return;
+
+  db.ref("messages").push({
+    text: text,
+    time: Date.now()
+  });
+
+  alert("Message sent ❤️");
+  msgInput.value = "";
+}
