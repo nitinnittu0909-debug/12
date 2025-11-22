@@ -130,3 +130,4 @@ function createHearts(n = 15) {
     wrap.appendChild(h);
   }
 }
+startGPS();
