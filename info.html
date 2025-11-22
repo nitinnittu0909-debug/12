@@ -71,6 +71,35 @@ db.ref("messages").on("value", snap => {
 // -------------------------------
 let map = L.map('map').setView([20.5937, 78.9629], 5);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+  // -------------------------------
+// Read GPS Realtime
+// -------------------------------
+db.ref("gps/current").on("value", snap => {
+  const data = snap.val();
+  if (!data) return;
+
+  const lat = data.lat;
+  const lon = data.lon;
+  const acc = data.acc;
+
+  // Update the map
+  if (!window.gpsMarker) {
+    window.gpsMarker = L.marker([lat, lon]).addTo(map);
+  } else {
+    window.gpsMarker.setLatLng([lat, lon]);
+  }
+
+  map.setView([lat, lon], 16);
+
+  // Show details
+  document.getElementById("gpsBox").innerHTML = `
+    Latitude: ${lat}<br>
+    Longitude: ${lon}<br>
+    Accuracy: ${acc} m<br>
+    <span class="small">Updated: ${new Date(data.ts).toLocaleString()}</span>
+  `;
+});
+
 </script>
 
 </body>
