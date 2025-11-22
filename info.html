@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Info Panel — Map & Messages</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <style>
+    body{background:#0d0d0d;color:#fff;font-family:sans-serif;margin:0;padding:16px}
+    h1{font-size:18px;margin:0 0 10px}
+    #map{height:420px;border-radius:12px;overflow:hidden;margin-bottom:12px}
+    .box{background:#111;padding:12px;border-radius:10px;margin-bottom:12px;white-space:pre-wrap}
+    .small{font-size:13px;opacity:0.9}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    button{padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:#fff;cursor:pointer}
+  </style>
+</head>
+<body>
+
+  <h1>📍 Live Road Map & Messages</h1>
+
+  <div id="map">Loading map…</div>
+
+  <div class="controls">
+    <button id="centerBtn">Center to Latest Location</button>
+    <button id="clearBtn">Clear Messages</button>
+    <button id="reloadBtn">Reload</button>
+  </div>
+
+  <div class="box small" id="gpsBox">Waiting for location...</div>
+
+  <h2 style="margin-top:10px">📨 Messages (one-time)</h2>
+  <div id="msgs" class="box">No messages yet.</div>
+
+<script>
+const LS_GPS = 'cuteapp_gps';
+const LS_MESSAGES = 'cuteapp_msgs';
+
+// initialize map
+let map = L.map('map', { preferCanvas: true }).setView([20.5937, 78.9629], 5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+let marker = null;
+
+function render(){
+  // GPS
+  const g = localStorage.getItem(LS_GPS);
+  const gpsBox = document.getElementById('gpsBox');
+  if(g){
+    try{
+      const obj = JSON.parse(g);
+      const lat = obj.lat;
+      const lon = obj.lon;
+      const d = new Date(obj.ts);
+      gpsBox.innerHTML = 'Latitude: ' + lat + '<br>Longitude: ' + lon + '<br>Accuracy: ' + (obj.acc || 'n/a') + ' m<br><span class="small">updated: ' + d.toLocaleString() + '</span>';
+
+      // update map & marker
+      map.setView([lat, lon], 16);
+      if(marker){ marker.setLatLng([lat, lon]); }
+      else {
+        marker = L.marker([lat, lon]).addTo(map).bindPopup('Current Location').openPopup();
+      }
+    }catch(e){
+      gpsBox.textContent = g;
+    }
+  } else {
+    gpsBox.textContent = 'No location yet.';
+  }
+
+  // Messages
+  const m = localStorage.getItem(LS_MESSAGES);
+  const msgsEl = document.getElementById('msgs');
+  if(m){
+    try{
+      const arr = JSON.parse(m);
+      if(arr.length === 0){ msgsEl.textContent = 'No messages yet.'; return; }
+      msgsEl.innerHTML = arr.map(it=> {
+        const d = new Date(it.ts);
+        return '<div style="margin-bottom:8px;padding:8px;background:#111;border-radius:8px"><strong>' + escapeHtml(it.text) + '</strong><div class="small" style="opacity:0.8;margin-top:6px">id:' + it.id + ' · ' + d.toLocaleString() + '</div></div>';
+      }).join('');
+    }catch(e){
+      msgsEl.textContent = m;
+    }
+  } else {
+    msgsEl.textContent = 'No messages yet.';
+  }
+}
+
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// initial render + interval
+render();
+const interval = setInterval(render, 1000);
+
+// storage event
+window.addEventListener('storage', render);
+
+// controls
+document.getElementById('centerBtn').addEventListener('click', ()=> {
+  const g = localStorage.getItem(LS_GPS);
+  if(!g) return alert('No location yet');
+  const obj = JSON.parse(g);
+  map.setView([obj.lat, obj.lon], 16);
+});
+document.getElementById('clearBtn').addEventListener('click', ()=> {
+  if(confirm('Clear all messages?')){
+    localStorage.removeItem(LS_MESSAGES);
+    render();
+  }
+});
+document.getElementById('reloadBtn').addEventListener('click', ()=> location.reload());
+
+// cleanup
+window.addEventListener('beforeunload', ()=> clearInterval(interval));
+</script>
+
+</body>
+</html>
