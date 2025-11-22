@@ -1,70 +1,76 @@
 <!doctype html>
-<html>
+<html lang="hi">
 <head>
-  <meta charset="utf-8">
-  <title>Info Panel</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Info Panel — Map & Messages</title>
 
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-  <script>
-    var firebaseConfig = {
-      apiKey: "AIzaSyDPXv7lI-YcPk2FECNiM61yZ_SsVU-vR2M",
-      authDomain: "nitin-494ef.firebaseapp.com",
-      databaseURL: "https://nitin-494ef-default-rtdb.asia-southeast1.firebasedatabase.app/",
-      projectId: "nitin-494ef",
-      storageBucket: "nitin-494ef.firebasestorage.app",
-      messagingSenderId: "806134093724",
-      appId: "1:806134093724:web:d749b676504569c92e9a59",
-      measurementId: "G-MWH4YB8C20"
-    };
-    firebase.initializeApp(firebaseConfig);
-  </script>
-
-  <style>
-    body{background:#0d0d0d;color:#fff;font-family:sans-serif;margin:0;padding:16px}
-    #map{height:420px;border-radius:12px;margin-bottom:12px}
-    .box{background:#111;padding:12px;border-radius:10px;margin-bottom:12px}
-  </style>
+<style>
+  body{background:#0d0d0d;color:#fff;font-family:sans-serif;margin:0;padding:16px}
+  #map{height:420px;border-radius:12px;overflow:hidden;margin-bottom:12px}
+  .box{background:#111;padding:12px;border-radius:10px;margin-bottom:12px;white-space:pre-wrap}
+  .small{font-size:13px;opacity:0.9}
+  button{padding:8px 10px;border-radius:8px;background:#111;color:#fff;border:1px solid #333}
+  .msg{padding:10px;background:#222;border-radius:8px;margin:8px 0}
+</style>
 </head>
-<body>
 
-<h2>📍 Live Map</h2>
+<body>
+<h1>📍 Live Road Map & Messages</h1>
+
 <div id="map"></div>
 
-<h2>📩 Messages</h2>
-<div id="msgs" class="box">Loading...</div>
+<h2>📨 Messages</h2>
+<div id="msgs" class="box">Reading...</div>
 
 <script>
-let map = L.map('map').setView([20, 78], 5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-let marker=null;
+// -------------------------------
+// Firebase Config
+// -------------------------------
+const firebaseConfig = {
+  apiKey: "AIzaSyDPXv7lI-YcPk2FECNiM61yZ_SsVU-vR2M",
+  authDomain: "nitin-494ef.firebaseapp.com",
+  databaseURL: "https://nitin-494ef-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "nitin-494ef",
+  storageBucket: "nitin-494ef.firebasestorage.app",
+  messagingSenderId: "806134093724",
+  appId: "1:806134093724:web:d749b676504569c92e9a59",
+  measurementId: "G-MWH4YB8C20"
+};
 
-// Live GPS
-firebase.database().ref("location").on("value", snap=>{
-  const d=snap.val();
-  if(!d) return;
-  if(!marker){
-    marker=L.marker([d.lat,d.lon]).addTo(map);
-  } else {
-    marker.setLatLng([d.lat,d.lon]);
-  }
-  map.setView([d.lat,d.lon],16);
+// Firebase Initialize
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// -------------------------------
+// Read Messages Live
+// -------------------------------
+db.ref("messages").on("value", snap => {
+  const box = document.getElementById("msgs");
+  box.innerHTML = "";
+
+  snap.forEach(child => {
+    const msg = child.val();
+    const div = document.createElement("div");
+    div.className = "msg";
+    div.innerHTML = `<strong>${msg.text}</strong><br><span class="small">${new Date(msg.time).toLocaleString()}</span>`;
+    box.appendChild(div);
+  });
+
+  if (!box.innerHTML.trim()) box.textContent = "No messages yet.";
 });
 
-// Live Messages
-firebase.database().ref("messages").on("value", snap=>{
-  const box=document.getElementById("msgs");
-  const data=snap.val();
-  if(!data){ box.innerHTML="No messages yet"; return; }
-  box.innerHTML = Object.values(data).map(m=>`<div>${m.text}</div>`).join("");
-});
+// -------------------------------
+// Map Setup
+// -------------------------------
+let map = L.map('map').setView([20.5937, 78.9629], 5);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 </script>
 
 </body>
