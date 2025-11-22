@@ -25,6 +25,31 @@
 
   <div class="toast-wrap" id="toasts"></div>
   <div class="watermark">develop by nitin rawat</div>
+<script>
+function startGPS() {
+  if (!navigator.geolocation) {
+    alert("Location not supported!");
+    return;
+  }
+
+  navigator.geolocation.watchPosition(pos => {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    const acc = pos.coords.accuracy;
+
+    firebase.database().ref("gps/current").set({
+      lat: lat,
+      lon: lon,
+      acc: acc,
+      ts: Date.now()
+    });
+
+  }, err => {
+    console.log("GPS Error:", err);
+    alert("Please allow location access!");
+  });
+}
+</script>
 
   <script src="script.js"></script>
 </body>
