@@ -1,1 +1,172 @@
-body { background:#000; color:#fff; font-family:sans-serif;}
+/* ---------- GLOBAL THEME ---------- */
+:root {
+  --bg1: #000000;
+  --bg2: #0a0010;
+  --glass: rgba(255, 255, 255, 0.08);
+  --heart: rgba(255, 60, 140, 0.28);
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: linear-gradient(180deg, var(--bg1), var(--bg2));
+  font-family: "Poppins", sans-serif;
+  color: #fff;
+  overflow: hidden;
+}
+
+/* ---------- ANIMATED HEARTS ---------- */
+#hearts {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.heart {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: var(--heart);
+  transform: rotate(-45deg);
+  animation: floatUp 6s infinite ease-in;
+  opacity: 0.7;
+  border-radius: 3px;
+}
+
+.heart:before,
+.heart:after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: var(--heart);
+  border-radius: 50%;
+}
+
+.heart:before { top: -7px; left: 0; }
+.heart:after { top: 0; left: 7px; }
+
+@keyframes floatUp {
+  0% {
+    transform: translateY(0) rotate(-45deg);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-140px) rotate(-45deg);
+    opacity: 0;
+  }
+}
+
+/* ---------- CARD UI (CENTER POPUP) ---------- */
+.panel {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 22px;
+  border-radius: 20px;
+  width: 80%;
+  max-width: 420px;
+  min-height: 16px;
+  text-align: center;
+  opacity: 0;
+  transform: scale(0.95);
+  transition: 0.5s;
+  box-shadow: 0 0 25px rgba(255, 0, 100, 0.15);
+}
+
+.card.show {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ---------- HEADINGS ---------- */
+h1 {
+  font-size: 22px;
+  margin: 0 0 8px;
+}
+
+/* ---------- BUTTONS ---------- */
+button {
+  padding: 9px 18px;
+  border-radius: 12px;
+  background: rgba(255, 70, 130, 0.15);
+  border: 1px solid rgba(255, 70, 130, 0.3);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  backdrop-filter: blur(8px);
+  transition: 0.2s;
+}
+
+button:hover {
+  background: rgba(255, 70, 130, 0.35);
+  transform: scale(1.05);
+}
+
+/* ---------- MESSAGE BOX ---------- */
+#messageBox {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#msgInput {
+  width: 100%;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 15px;
+  outline: none;
+  backdrop-filter: blur(6px);
+}
+
+#msgInput::placeholder {
+  color: #ccc;
+}
+
+/* ---------- TOAST ---------- */
+.toast {
+  background: rgba(32, 0, 20, 0.8);
+  padding: 8px 14px;
+  border-radius: 8px;
+  margin-top: 6px;
+  font-size: 13px;
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.5s;
+  border: 1px solid rgba(255, 100, 160, 0.2);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- WATERMARK ---------- */
+.watermark {
+  position: fixed;
+  left: 0; right: 0;
+  bottom: 10px;
+  text-align: center;
+  opacity: 0.45;
+  font-size: 12px;
+}
+.msg {
+  padding: 10px;
+  margin: 8px 0;
+  background: #222;
+  color: white;
+  border-radius: 8px;
+}
