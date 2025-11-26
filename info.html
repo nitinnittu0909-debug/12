@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Info Panel — Map & Messages</title>
+<title>Info Panel — Map & Private Chats</title>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -13,26 +13,49 @@
 
 <style>
   body{background:#0d0d0d;color:#fff;font-family:sans-serif;margin:0;padding:16px}
-  #map{height:420px;border-radius:12px;overflow:hidden;margin-bottom:12px}
+  #map{height:420px;border-radius:12px;overflow:hidden;margin-bottom:12px;background:#111}
   .box{background:#111;padding:12px;border-radius:10px;margin-bottom:12px;white-space:pre-wrap}
   .small{font-size:13px;opacity:0.9}
-  button{padding:8px 10px;border-radius:8px;background:#111;color:#fff;border:1px solid #333}
-  .msg{padding:10px;background:#222;border-radius:8px;margin:8px 0}
+  button{padding:8px 10px;border-radius:8px;background:#111;color:#fff;border:1px solid #333; cursor:pointer}
+  .msg{padding:10px;background:#222;border-radius:8px;margin:8px 0; cursor:pointer}
+  #chatsList { max-height:260px; overflow:auto; }
+  #chatWindow { max-height:260px; overflow:auto; background:#0b0b0b; padding:10px; border-radius:8px }
+  .meta { font-size:12px; opacity:0.8; }
+  #controls { display:flex; gap:8px; margin-top:8px; }
+  .notice { color:#ddd; font-size:13px; margin-bottom:8px; }
 </style>
 </head>
 
 <body>
-<h1>📍 Live Road Map & Messages</h1>
+<h1>📍 Admin — Private Chats & Live Location</h1>
 
-<div id="map"></div>
+<div id="map">Loading map…</div>
 
-<h2>📨 Messages</h2>
-<div id="msgs" class="box">Reading...</div>
+<div class="box">
+  <strong>Selected Chat:</strong> <span id="selectedName">None</span>
+  <div id="gpsBox" class="small" style="margin-top:8px">GPS: —</div>
+</div>
+
+<div style="display:flex; gap:12px; align-items:flex-start;">
+  <div style="flex:1">
+    <h2>Active Chats</h2>
+    <div id="chatsList" class="box">Loading...</div>
+  </div>
+
+  <div style="flex:1">
+    <h2>Chat Window</h2>
+    <div id="chatWindow">Select a chat from left</div>
+    <div id="controls">
+      <input id="replyInput" placeholder="Type reply..." style="flex:1; padding:8px; border-radius:6px; background:#0b0b0b; border:1px solid #222; color:#fff" />
+      <button id="replyBtn">Reply</button>
+    </div>
+  </div>
+</div>
 
 <script>
-// -------------------------------
-// Firebase Config
-// -------------------------------
+/* -------------------------------
+   FIREBASE CONFIG - same as index
+   ------------------------------- */
 const firebaseConfig = {
   apiKey: "AIzaSyDPXv7lI-YcPk2FECNiM61yZ_SsVU-vR2M",
   authDomain: "nitin-494ef.firebaseapp.com",
@@ -43,63 +66,184 @@ const firebaseConfig = {
   appId: "1:806134093724:web:d749b676504569c92e9a59",
   measurementId: "G-MWH4YB8C20"
 };
-
-// Firebase Initialize
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// -------------------------------
-// Read Messages Live
-// -------------------------------
-db.ref("messages").on("value", snap => {
-  const box = document.getElementById("msgs");
-  box.innerHTML = "";
+let currentChat = null;
+let chatsCache = {};
+let gmap = null;
+let gmarker = null;
+let leafletMap = null;
+let leafletMarker = null;
+let usingGoogle = false;
 
-  snap.forEach(child => {
-    const msg = child.val();
-    const div = document.createElement("div");
-    div.className = "msg";
-    div.innerHTML = `<strong>${msg.text}</strong><br><span class="small">${new Date(msg.time).toLocaleString()}</span>`;
-    box.appendChild(div);
+/* -------------------------------
+   GOOGLE MAPS (2D) loader & init
+   NOTE: replace PASTE_YOUR_REAL_API_KEY_HERE with your real API key
+   ------------------------------- */
+function loadGoogleMapsScript(cb) {
+  // if already loaded, call cb
+  if (window.google && window.google.maps) {
+    cb();
+    return;
+  }
+  const s = document.createElement('script');
+  s.src = "https://maps.googleapis.com/maps/api/js?key=PASTE_YOUR_REAL_API_KEY_HERE";
+  s.async = true;
+  s.defer = true;
+  s.onload = cb;
+  s.onerror = () => {
+    console.warn("Google Maps failed to load — falling back to Leaflet (OpenStreetMap)");
+    initLeafletFallback();
+  };
+  document.head.appendChild(s);
+}
+
+function initGMap() {
+  try {
+    gmap = new google.maps.Map(document.getElementById("map"), {
+      center: { lat: 20.5937, lng: 78.9629 },
+      zoom: 5,
+      mapTypeId: "roadmap", // 2D normal map
+      disableDefaultUI: true
+    });
+    usingGoogle = true;
+  } catch (e) {
+    console.error("initGMap error:", e);
+    initLeafletFallback();
+  }
+}
+
+function initLeafletFallback() {
+  // If Leaflet already initialized, skip
+  if (leafletMap) return;
+  document.getElementById("map").innerHTML = ""; // clear
+  leafletMap = L.map('map').setView([20.5937, 78.9629], 5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(leafletMap);
+  usingGoogle = false;
+}
+
+/* Try to load Google Maps; if it fails, Leaflet will be used automatically */
+loadGoogleMapsScript(() => initGMap());
+
+/* -------------------------------
+   LIST ALL ACTIVE PRIVATE CHATS
+   ------------------------------- */
+const chatsList = document.getElementById("chatsList");
+db.ref("chat").on("value", snap => {
+  const data = snap.val() || {};
+  chatsCache = data;
+  chatsList.innerHTML = "";
+  const keys = Object.keys(data).sort((a,b) => {
+    const ta = data[a]?.messages ? lastTime(data[a].messages) : 0;
+    const tb = data[b]?.messages ? lastTime(data[b].messages) : 0;
+    return tb - ta;
   });
 
-  if (!box.innerHTML.trim()) box.textContent = "No messages yet.";
+  if (keys.length === 0) chatsList.textContent = "No active chats.";
+
+  keys.forEach(id => {
+    const name = (data[id] && data[id].name) ? data[id].name : "(no name)";
+    const last = data[id].gps ? new Date(data[id].gps.ts).toLocaleTimeString() : "—";
+    const div = document.createElement("div");
+    div.className = "msg";
+    div.innerHTML = `<b>${escapeHtml(name)}</b><div class="meta">Last seen: ${last}</div>`;
+    div.onclick = () => openChat(id);
+    chatsList.appendChild(div);
+  });
 });
 
-// -------------------------------
-// Map Setup
-// -------------------------------
-let map = L.map('map').setView([20.5937, 78.9629], 5);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-  // -------------------------------
-// Read GPS Realtime
-// -------------------------------
-db.ref("gps/current").on("value", snap => {
-  const data = snap.val();
-  if (!data) return;
+function lastTime(msgObj) {
+  let t = 0;
+  Object.values(msgObj || {}).forEach(m => { if (m.time && m.time > t) t = m.time; });
+  return t;
+}
 
-  const lat = data.lat;
-  const lon = data.lon;
-  const acc = data.acc;
+/* -------------------------------
+   OPEN CHAT (select one)
+   ------------------------------- */
+const chatWindow = document.getElementById("chatWindow");
+const selectedName = document.getElementById("selectedName");
+const gpsBox = document.getElementById("gpsBox");
 
-  // Update the map
-  if (!window.gpsMarker) {
-    window.gpsMarker = L.marker([lat, lon]).addTo(map);
-  } else {
-    window.gpsMarker.setLatLng([lat, lon]);
-  }
+function openChat(id) {
+  currentChat = id;
+  const meta = chatsCache[id] || {};
+  selectedName.textContent = meta.name || id;
+  chatWindow.innerHTML = "Loading conversation...";
 
-  map.setView([lat, lon], 16);
+  // Listen messages
+  db.ref("chat/" + id + "/messages").off(); // remove previous listeners
+  db.ref("chat/" + id + "/messages").on("value", snap => {
+    chatWindow.innerHTML = "";
+    snap.forEach(c => {
+      const m = c.val();
+      const div = document.createElement("div");
+      div.innerHTML = `<b>${m.sender === "admin" ? "You" : (m.name || "User")}</b>: ${escapeHtml(m.text)}
+                       <div class="meta">${new Date(m.time).toLocaleString()}</div>`;
+      chatWindow.appendChild(div);
+    });
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  });
 
-  // Show details
-  document.getElementById("gpsBox").innerHTML = `
-    Latitude: ${lat}<br>
-    Longitude: ${lon}<br>
-    Accuracy: ${acc} m<br>
-    <span class="small">Updated: ${new Date(data.ts).toLocaleString()}</span>
-  `;
-});
+  // Listen GPS for this chat (remove previous gps listener first)
+  db.ref("chat/" + id + "/gps").off();
+  db.ref("chat/" + id + "/gps").on("value", snap => {
+    const g = snap.val();
+    if (!g) {
+      gpsBox.textContent = "GPS: —";
+      return;
+    }
+    gpsBox.innerHTML = `Latitude: ${g.lat}<br>Longitude: ${g.lon}<br>Accuracy: ${g.acc} m<br><span class="small">Updated: ${new Date(g.ts).toLocaleString()}</span>`;
 
+    // Update marker/map based on which map library is active
+    const pos = { lat: parseFloat(g.lat), lng: parseFloat(g.lon) };
+    if (usingGoogle && typeof google !== "undefined" && gmap) {
+      gmap.setCenter(pos);
+      gmap.setZoom(18);
+      if (!gmarker) {
+        gmarker = new google.maps.Marker({ position: pos, map: gmap, title: meta.name || "User" });
+      } else {
+        gmarker.setPosition(pos);
+      }
+    } else {
+      // Leaflet fallback
+      if (leafletMap) {
+        leafletMap.setView([pos.lat, pos.lng], 16);
+        if (!leafletMarker) {
+          leafletMarker = L.marker([pos.lat, pos.lng]).addTo(leafletMap);
+        } else {
+          leafletMarker.setLatLng([pos.lat, pos.lng]);
+        }
+      }
+    }
+  });
+}
+
+/* -------------------------------
+   Admin reply
+   ------------------------------- */
+document.getElementById("replyBtn").onclick = () => {
+  if (!currentChat) { alert("Select a chat first"); return; }
+  const txt = document.getElementById("replyInput").value.trim();
+  if (!txt) return alert("Type a reply");
+  db.ref("chat/" + currentChat + "/messages").push({
+    sender: "nittu",
+    text: txt,
+    time: Date.now()
+  });
+  document.getElementById("replyInput").value = "";
+};
+
+/* -------------------------------
+   small helpers
+   ------------------------------- */
+function escapeHtml(s) {
+  return String(s||'').replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]; });
+}
 </script>
 
 </body>
